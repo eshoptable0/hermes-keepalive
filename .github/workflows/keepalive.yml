@@ -2,7 +2,7 @@ name: Hermes Keepalive
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '*/20 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -18,7 +18,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install instabox CLI
+      - name: Install instabox CLI (cached)
+        uses: actions/cache@v4
+        id: cli-cache
+        with:
+          path: ~/.local/bin/instabox
+          key: instabox-cli-v1
+
+      - name: Download CLI if not cached
+        if: steps.cli-cache.outputs.cache-hit != 'true'
         run: curl -fsSL https://instabox.sh/install.sh | bash
 
       - name: Wake machine if not running
@@ -30,25 +38,29 @@ jobs:
           STATE=$(instabox list --json 2>/dev/null | jq -r --arg id "$MACHINE_ID" '.[] | select((.id|tostring|startswith($id)) or .name=="hermes-vps") | .state' | head -1)
           echo "machine state: ${STATE:-unknown}"
           if [ -z "$STATE" ]; then
-            echo "machine not found in list — attempting start anyway"
             instabox start hermes-vps --no-wait || true
           elif [ "$STATE" != "running" ]; then
             echo "waking machine..."
             instabox start hermes-vps --no-wait || instabox start hermes-vps
             sleep 45
-            STATE2=$(instabox list --json 2>/dev/null | jq -r --arg id "$MACHINE_ID" '.[] | select((.id|tostring|startswith($id)) or .name=="hermes-vps") | .state' | head -1)
-            echo "state after start: $STATE2"
+            instabox list --json 2>/dev/null | jq -r --arg id "$MACHINE_ID" '.[] | select((.id|tostring|startswith($id)) or .name=="hermes-vps") | .state' | head -1
           else
             echo "machine running — nothing to do"
           fi
 
-      - name: Heartbeat
+      - name: Daily heartbeat (prevents 60-day workflow disable)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config user.name "keepalive-bot"
-          git config user.email "keepalive@users.noreply.github.com"
-          date -u +"last run: %Y-%m-%dT%H:%M:%SZ" > .heartbeat
-          git add .heartbeat
-          git diff --cached --quiet && echo "no change" || git commit -m "heartbeat $(date -u +%s)"
-          git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git HEAD:main || true
+          TODAY=$(date -u +%Y-%m-%d)
+          LAST=$(git log -1 --format=%cs 2>/dev/null || echo "")
+          if [ "$LAST" != "$TODAY" ]; then
+            git config user.name "keepalive-bot"
+            git config user.email "keepalive@users.noreply.github.com"
+            echo "$TODAY" > .heartbeat
+            git add .heartbeat
+            git commit -m "heartbeat $TODAY"
+            git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git HEAD:main || true
+          else
+            echo "heartbeat already done today"
+          fi
