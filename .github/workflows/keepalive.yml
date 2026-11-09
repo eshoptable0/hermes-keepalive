@@ -29,24 +29,22 @@ jobs:
         if: steps.cli-cache.outputs.cache-hit != 'true'
         run: curl -fsSL https://instabox.sh/install.sh | bash
 
-      - name: Wake machine if not running
+      - name: Wake machines if not running
         env:
           INSTABOX_API_KEY: ${{ secrets.INSTABOX_API_KEY }}
-          MACHINE_ID: m_agq36rbxje3ik64ti4crshki6i
         run: |
           set -e
-          STATE=$(instabox list --json 2>/dev/null | jq -r --arg id "$MACHINE_ID" '.[] | select((.id|tostring|startswith($id)) or .name=="hermes-vps") | .state' | head -1)
-          echo "machine state: ${STATE:-unknown}"
-          if [ -z "$STATE" ]; then
-            instabox start hermes-vps --no-wait || true
-          elif [ "$STATE" != "running" ]; then
-            echo "waking machine..."
-            instabox start hermes-vps --no-wait || instabox start hermes-vps
-            sleep 45
-            instabox list --json 2>/dev/null | jq -r --arg id "$MACHINE_ID" '.[] | select((.id|tostring|startswith($id)) or .name=="hermes-vps") | .state' | head -1
-          else
-            echo "machine running — nothing to do"
-          fi
+          for M in hermes-vps sakeena; do
+            STATE=$(instabox list --json 2>/dev/null | jq -r --arg m "$M" '.[] | select(.name==$M) | .state' | head -1)
+            echo "$M state: ${STATE:-unknown}"
+            if [ "$STATE" != "running" ]; then
+              echo "waking $M..."
+              instabox start "$M" --no-wait || instabox start "$M" || true
+              sleep 30
+            fi
+          done
+          echo "--- final states ---"
+          instabox list --json 2>/dev/null | jq -r '.[] | select(.name=="hermes-vps" or .name=="sakeena") | "\(.name): \(.state)"'
 
       - name: Daily heartbeat (prevents 60-day workflow disable)
         env:
