@@ -2,11 +2,11 @@ name: Hermes Keepalive
 
 on:
   schedule:
-    - cron: '*/30 * * * *'   # every 30 min — well inside the 2h limit
-  workflow_dispatch:          # manual trigger option
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
 
 permissions:
-  contents: write             # for the heartbeat commit
+  contents: write
 
 concurrency:
   group: keepalive
@@ -17,8 +17,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Install instabox CLI
         run: curl -fsSL https://instabox.sh/install.sh | bash
@@ -29,17 +27,22 @@ jobs:
           MACHINE_ID: m_agq36rbxje3ik64ti4crshki6i
         run: |
           set -e
-          STATE=$(instabox machines list --json 2>/dev/null | jq -r --arg id "$MACHINE_ID" '.[] | select(.id==$id or .name==$id) | .state' | head -1)
+          STATE=$(instabox list --json 2>/dev/null | jq -r --arg id "$MACHINE_ID" '.[] | select((.id|tostring|startswith($id)) or .name=="hermes-vps") | .state' | head -1)
           echo "machine state: ${STATE:-unknown}"
-          if [ "$STATE" != "running" ]; then
+          if [ -z "$STATE" ]; then
+            echo "machine not found in list — attempting start anyway"
+            instabox start hermes-vps --no-wait || true
+          elif [ "$STATE" != "running" ]; then
             echo "waking machine..."
-            instabox start "$MACHINE_ID" --no-wait || instabox start "$MACHINE_ID"
-            sleep 30
-            STATE2=$(instabox machines list --json 2>/dev/null | jq -r --arg id "$MACHINE_ID" '.[] | select(.id==$id or .name==$id) | .state' | head -1)
+            instabox start hermes-vps --no-wait || instabox start hermes-vps
+            sleep 45
+            STATE2=$(instabox list --json 2>/dev/null | jq -r --arg id "$MACHINE_ID" '.[] | select((.id|tostring|startswith($id)) or .name=="hermes-vps") | .state' | head -1)
             echo "state after start: $STATE2"
+          else
+            echo "machine running — nothing to do"
           fi
 
-      - name: Heartbeat (keep workflow active)
+      - name: Heartbeat
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
