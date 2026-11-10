@@ -18,6 +18,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Sleep window check (5-8 AM IST = no waking, Mohsin sleeps)
+        id: window
+        run: |
+          IST=$(TZ=Asia/Kolkata date +%H%M)
+          echo "IST now: $IST"
+          if [ "$IST" -ge 0500 ] && [ "$IST" -lt 0800 ]; then
+            echo "sleep=true" >> "$GITHUB_OUTPUT"
+            echo "Machine will NOT be woken during sleep window"
+          else
+            echo "sleep=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install instabox CLI (cached)
         uses: actions/cache@v4
         id: cli-cache
@@ -30,6 +42,8 @@ jobs:
         run: curl -fsSL https://instabox.sh/install.sh | bash
 
       - name: Wake machine 1 (hermes-vps)
+        if: steps.window.outputs.sleep != 'true'
+        if: steps.window.outputs.sleep != 'true'
         env:
           INSTABOX_API_KEY: ${{ secrets.INSTABOX_API_KEY }}
         run: |
@@ -41,6 +55,8 @@ jobs:
           fi
 
       - name: Wake machine 2 (sakeena)
+        if: steps.window.outputs.sleep != 'true'
+        if: steps.window.outputs.sleep != 'true'
         env:
           INSTABOX_API_KEY: ${{ secrets.INSTABOX_API_KEY_2 }}
         run: |
