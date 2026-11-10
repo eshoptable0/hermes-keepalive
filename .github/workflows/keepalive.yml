@@ -43,7 +43,6 @@ jobs:
 
       - name: Wake machine 1 (hermes-vps)
         if: steps.window.outputs.sleep != 'true'
-        if: steps.window.outputs.sleep != 'true'
         env:
           INSTABOX_API_KEY: ${{ secrets.INSTABOX_API_KEY }}
         run: |
@@ -55,7 +54,6 @@ jobs:
           fi
 
       - name: Wake machine 2 (sakeena)
-        if: steps.window.outputs.sleep != 'true'
         if: steps.window.outputs.sleep != 'true'
         env:
           INSTABOX_API_KEY: ${{ secrets.INSTABOX_API_KEY_2 }}
