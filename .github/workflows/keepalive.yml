@@ -53,6 +53,13 @@ jobs:
             sleep 30
           fi
 
+      - name: Activity exec hermes-vps (instabox tunnel activity)
+        if: steps.window.outputs.sleep != 'true'
+        env:
+          INSTABOX_API_KEY: ${{ secrets.INSTABOX_API_KEY }}
+        run: |
+          timeout 90 instabox exec hermes-vps -- bash -c "date; uptime | cut -d, -f1-2" > /dev/null 2>&1 || echo "exec skipped (ok if suspended)"
+
       - name: Wake machine 2 (sakeena)
         if: steps.window.outputs.sleep != 'true'
         env:
@@ -64,6 +71,13 @@ jobs:
             instabox start sakeena --no-wait || instabox start sakeena || true
             sleep 30
           fi
+
+      - name: Activity exec sakeena (instabox tunnel activity)
+        if: steps.window.outputs.sleep != 'true'
+        env:
+          INSTABOX_API_KEY: ${{ secrets.INSTABOX_API_KEY_2 }}
+        run: |
+          timeout 90 instabox exec sakeena -- bash -c "date; uptime | cut -d, -f1-2" > /dev/null 2>&1 || echo "exec skipped (ok if suspended)"
 
       - name: Daily heartbeat (prevents 60-day workflow disable)
         env:
