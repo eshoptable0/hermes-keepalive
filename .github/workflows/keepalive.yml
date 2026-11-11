@@ -58,7 +58,7 @@ jobs:
         env:
           INSTABOX_API_KEY: ${{ secrets.INSTABOX_API_KEY }}
         run: |
-          timeout 90 instabox exec hermes-vps -- bash -c "date; uptime | cut -d, -f1-2" > /dev/null 2>&1 || echo "exec skipped (ok if suspended)"
+          OUT=$(timeout 90 instabox exec hermes-vps -- bash -c "date; uptime" 2>&1 | tail -2) && echo "exec hermes-vps: $OUT" || echo "exec skipped (ok if suspended: $OUT)"
 
       - name: Wake machine 2 (sakeena)
         if: steps.window.outputs.sleep != 'true'
@@ -77,7 +77,7 @@ jobs:
         env:
           INSTABOX_API_KEY: ${{ secrets.INSTABOX_API_KEY_2 }}
         run: |
-          timeout 90 instabox exec sakeena -- bash -c "date; uptime | cut -d, -f1-2" > /dev/null 2>&1 || echo "exec skipped (ok if suspended)"
+          OUT=$(timeout 90 instabox exec sakeena -- bash -c "date; uptime" 2>&1 | tail -2) && echo "exec sakeena: $OUT" || echo "exec skipped (ok if suspended: $OUT)"
 
       - name: Daily heartbeat (prevents 60-day workflow disable)
         env:
